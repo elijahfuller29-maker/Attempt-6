@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101827">
+  <title>GBA Player</title>
+  <style>
+    :root { color-scheme: dark; --bg:#101827; --panel:#192538; --muted:#a8b3c5; --accent:#71a7ff; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 22px; background: radial-gradient(circle at top, #203657, var(--bg) 55%);
+      color: #f5f7fb; font: 15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif;
+    }
+    main { width: min(1050px, 100%); margin: 0 auto; }
+    header { text-align: center; margin: 8px 0 22px; }
+    h1 { margin: 0 0 6px; font-size: clamp(25px, 4vw, 36px); letter-spacing: -.03em; }
+    .sub, .hint { color: var(--muted); }
+    .panel { background: rgba(25,37,56,.96); border: 1px solid #31435d; border-radius: 16px; padding: 18px; }
+    .picker { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px; }
+    input[type=file] { max-width:100%; color:var(--muted); }
+    button, .file-label {
+      border:0; border-radius:10px; background:var(--accent); color:#071426; font-weight:700;
+      padding:11px 16px; cursor:pointer;
+    }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    #status { min-height:24px; margin:12px 0 0; color:var(--muted); text-align:center; }
+    #game-wrap { margin-top:16px; overflow:hidden; border-radius:14px; background:#05070b; border:1px solid #31435d; }
+    #game { width:100%; min-height:540px; height:min(72vh, 760px); }
+    #empty { min-height:540px; display:grid; place-items:center; padding:25px; text-align:center; color:var(--muted); }
+    .footer { text-align:center; margin:14px 0 0; font-size:12px; color:var(--muted); }
+    .hidden { display:none !important; }
+    @media (max-width:600px) {
+      body { padding:12px; }
+      .panel { padding:13px; }
+      #game, #empty { min-height:390px; height:65vh; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Game Boy Advance Player</h1>
+    <div class="sub">Choose a compatible game file to play in this page.</div>
+  </header>
+
+  <section class="panel">
+    <div class="picker">
+      <input id="rom-file" type="file" accept=".gba,.zip,application/zip">
+      <button id="load-button" type="button" disabled>Load game</button>
+      <button id="reset-button" type="button" class="hidden">Choose another game</button>
+    </div>
+    <div id="status" role="status" aria-live="polite">Select a .gba file (or a supported ZIP containing one).</div>
+  </section>
+
+  <section id="game-wrap">
+    <div id="empty">
+      <div>
+        <div style="font-size:42px;margin-bottom:8px">🎮</div>
+        <strong>Your game will appear here</strong>
+        <div class="hint">Select a compatible file above, then choose “Load game.”</div>
+      </div>
+    </div>
+    <div id="game"></div>
+  </section>
+  <p class="footer">Emulation provided by EmulatorJS. No game files are included or uploaded by this page.</p>
+</main>
+
+<script>
+(() => {
+  const fileInput = document.getElementById('rom-file');
+  const loadButton = document.getElementById('load-button');
+  const resetButton = document.getElementById('reset-button');
+  const status = document.getElementById('status');
+  const game = document.getElementById('game');
+  const empty = document.getElementById('empty');
+  let objectUrl = null;
+  let loaderAdded = false;
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files && fileInput.files[0];
+    loadButton.disabled = !file;
+    status.textContent = file ? `Selected: ${file.name}` : 'Select a compatible game file.';
+  });
+
+  loadButton.addEventListener('click', () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+
+    if (!/\.(gba|zip)$/i.test(file.name)) {
+      status.textContent = 'Please choose a .gba file or a supported .zip file.';
+      return;
+    }
+
+    if (loaderAdded) {
+      status.textContent = 'To load a different game, refresh this page and select the new file.';
+      return;
+    }
+
+    objectUrl = URL.createObjectURL(file);
+    empty.classList.add('hidden');
+    status.textContent = 'Starting emulator… this may take a moment on the first load.';
+
+    // EmulatorJS configuration must exist before loader.js is added.
+    window.EJS_player = '#game';
+    window.EJS_core = 'gba';
+    window.EJS_gameUrl = objectUrl;
+    window.EJS_gameName = file.name.replace(/\.[^.]+$/, '');
+    window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+    window.EJS_startOnLoaded = true;
+    window.EJS_color = '#71a7ff';
+
+    const loader = document.createElement('script');
+    loader.src = window.EJS_pathtodata + 'loader.js';
+    loader.onload = () => {
+      status.textContent = 'Emulator loaded. Click the game area if audio is muted by your browser.';
+    };
+    loader.onerror = () => {
+      status.textContent = 'The emulator could not load. Check your internet connection and try again.';
+    };
+    loaderAdded = true;
+    document.body.appendChild(loader);
+    loadButton.disabled = true;
+    resetButton.classList.remove('hidden');
+  });
+
+  resetButton.addEventListener('click', () => location.reload());
+  window.addEventListener('beforeunload', () => {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  });
+})();
+</script>
+</body>
+</html>
